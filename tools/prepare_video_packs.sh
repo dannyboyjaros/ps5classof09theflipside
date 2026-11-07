@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Build video frame packs for the PS5 runtime.
+# Build optional JPEG fallback packs for the runtime.
+#
+# The PS5 build decodes the original .webm files with libvpx/libvorbis and
+# does not need these packs.  They remain useful for the SDL2 host build or
+# as a compatibility fallback.  Stage them with stage_assets.py --packs.
 #
 #   prepare_video_packs.sh <game-dir> <out-dir> [height] [jpeg-quality]
 #

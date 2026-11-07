@@ -25,6 +25,7 @@ exec env \
     APP_INCLUDE_PATHS='src/sdl src' \
     APP_ASSETS=assets \
     APP_ROOT_FILES='GAME_FILES.txt README-PS5.txt' \
+    PACBREW_PACKAGES='vpx vorbis ogg' \
     USE_CCACHE=1 \
     PS5_CLANG="${PS5_CLANG:-clang-18}" \
     bash tools/build.sh Folder

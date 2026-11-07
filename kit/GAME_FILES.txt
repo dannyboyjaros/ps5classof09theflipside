@@ -121,6 +121,7 @@ SparkleSequence/Sparkles_00056.png
 SparkleSequence/Sparkles_00057.png
 SparkleSequence/Sparkles_00058.png
 SparkleSequence/Sparkles_00059.png
+WCsplash.webm
 audio/Ambience/Alley_Ambience.mp3
 audio/Ambience/Bar_Ambience.mp3
 audio/Ambience/Bar_NoMusic_Ambience.mp3
@@ -272,6 +273,10 @@ audio/Scenes/0095.mp3
 audio/Scenes/0096.mp3
 audio/Scenes/0097.mp3
 audio/menu_piano.mp3
+cs0030.webm
+cs0040.webm
+cs0056.webm
+cs0081.webm
 gui/ClassOf09logo.png
 gui/back_pills_vert.png
 gui/button/check_foreground.png
@@ -744,6 +749,11 @@ laptopsearch/laptopscreen.png
 laptopsearch/laptopscreenoverlay.png
 laptopsearch/laptopsearchrollover.png
 laptopsearch/laptopshell.png
+logosplash.webm
+opening.webm
+secret_a.webm
+secret_b.webm
+secret_c.webm
 shadowloop/shadow_0000.png
 shadowloop/shadow_0001.png
 shadowloop/shadow_0002.png

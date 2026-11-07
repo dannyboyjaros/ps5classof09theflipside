@@ -25,9 +25,10 @@ ending tracker, the new-message menu alert, and the smoke and Hatman overlays.
 - **9 choice menus** with their conditions
 - Every background, sprite, flip, and sampled ATL slide/fade, including the
   120-frame smoke and 10-frame Hatman overlays
-- **All videos**: opening narration, WCsplash, logosplash, the four ending
-  videos, the three secret videos, and the animated main-menu background
-  via 720p JPEG frame packs and MP3 audio (~822 MB)
+- **All videos** decoded directly from the game's original VP8 + Vorbis
+  `.webm` files with libvpx and libvorbis: opening narration, WCsplash,
+  logosplash, the four ending videos, the three secret videos, and the
+  animated main-menu background
 - The game's cutscene dialogue: yellow Helvetica Narrow with a black outline,
   no text box (`csbox`)
 - The five-message ending tracker, including the 0098 inbox message, the
@@ -42,22 +43,24 @@ ending tracker, the new-message menu alert, and the smoke and Hatman overlays.
 - Not Ren'Py: arbitrary screens, the phone/PDA quick menu, custom Python, and
   custom transitions are not interpreted. Only the subset the exporter emits
   runs.
-- Video is stored as 720p JPEG frames (about 822 MB for all videos) because
-  the PS5 homebrew backend has no VP8 decoder. Use `1920 4` with
-  `tools/prepare_video_packs.sh` for a larger 1080p package, or `960 10` for a
-  smaller one.
+- Video is decoded in software with libvpx/libvorbis. The PS5 CPU handles
+  1080p30 VP8 comfortably, but this path is newer than the JPEG frame-pack
+  fallback and should be checked on each firmware if you see dropped frames.
+  The old `C09V` JPEG frame packs are still supported as an optional fallback
+  for the host build or a console where WebM playback is not wanted.
 - The Flip Side's `search_engine_screen` exists in `screens.rpyc` but no
   in-story `call screen` reaches it, so the laptop is present in the runtime
   but normally unused.
 - Hardware behaviour (`/app0`, `/download0`, audio) has been exercised on the
   PS5 through the directory-style app folder; the host build is also verified.
 
-### Video packs
+### Video playback
 
-The pack format is a 28-byte header (`C09V`, version, width, height, fps,
-frame count, reserved), a `uint32` offset per frame, then the JPEG frames.
-Audio sits beside the pack as an MP3. `IMG_LoadMemory` decodes frames from RAM
-on both backends.
+The runtime demuxes WebM itself, decodes VP8 with libvpx, and decodes the
+Vorbis audio to a temporary WAV that the existing mixer plays. The original
+`.webm` files live under `assets/game/`; there is no frame extraction step.
+The optional `C09V` fallback (a 28-byte header, a `uint32` offset per frame,
+then JPEG frames) is still supported when `assets/videos/packs/*.pkv` exists.
 
 ## Build
 
@@ -74,7 +77,10 @@ pickle layout):
 
 Output: `build/script.json` (6,440 ops, 107 labels, 5 endings, 0 unsupported).
 
-### 2. Build the video packs (WSL/Linux, needs ffmpeg)
+### 2. Optional: build JPEG fallback packs (host / compatibility)
+
+This step is **not needed for the PS5 WebM build**. It exists only if you want
+the `C09V` fallback path. It needs WSL/Linux with ffmpeg:
 
 ```bash
 tools/prepare_video_packs.sh "/mnt/c/.../Class of 09 The Flip Side/game" build/videos 720 8
@@ -82,7 +88,8 @@ tools/prepare_video_packs.sh "/mnt/c/.../Class of 09 The Flip Side/game" build/v
 tools/pack_one.sh "/mnt/c/.../game/gui/menu 2/BG living.webm" build/videos BG_living 720 8 30
 ```
 
-At 720p the ten game videos plus the menu background are about 822 MB.
+Stage them with `tools/stage_assets.py ... --packs`. Without `--packs`, the
+original `.webm` files are staged instead.
 
 ### 3. Stage the assets
 
@@ -90,8 +97,9 @@ At 720p the ten game videos plus the menu background are about 822 MB.
 python3 tools/stage_assets.py "/mnt/c/.../Class of 09 The Flip Side/game" build kit/assets
 ```
 
-Writes `kit/assets/script.json`, `kit/assets/game/` (877 files, ~1.5 GB), the
-video packs, and `kit/GAME_FILES.txt`.
+Writes `kit/assets/script.json`, `kit/assets/game/` (887 files, about 970 MB
+including the original videos), and `kit/GAME_FILES.txt`. No frame packs are
+copied unless `--packs` is passed.
 
 ### 4. Build the PS5 app (WSL2)
 
@@ -115,6 +123,10 @@ cmake -S . -B build -G Ninja -DSDL2_DIR=...
 cmake --build build
 build\class09_runtime.exe build\script.json "..\Class of 09 The Flip Side\game"
 ```
+
+The host build uses the JPEG packs by default. On a Linux host with
+libvpx/libvorbis/SDL2 development packages, `-DC09FS_WEBM=ON` builds the same
+WebM path the PS5 uses.
 
 Saves and screenshots go to `build/saves`.
 
@@ -142,6 +154,7 @@ Saves and screenshots go to `build/saves`.
 ## Repository layout
 
 - `src/` — the portable C runtime and the SDL2 host entry point.
+- `src/webm.c` — the WebM/Matroska demuxer and VP8/Vorbis playback.
 - `kit/src/` — the same runtime plus the PS5 backend used by the console build.
 - `tools/endings_c09fs.json` — the five inbox messages shown by the tracker.
 - `tools/export_script.py` — decompiles the game's `.rpyc` to `script.json`.

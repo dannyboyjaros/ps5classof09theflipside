@@ -15,9 +15,7 @@ FOLDER CONTENTS
   sce_sys/icon0.png             launcher icon
   sce_module/libc.prx           clean-room libc runtime used by the app
   assets/script.json            exported game bytecode
-  assets/game/                  your copy of the PC game (877 files)
-  assets/videos/*.mp3           audio beside each video
-  assets/videos/packs/*.pkv     C09V JPEG frame packs for all videos
+  assets/game/                  your copy of the PC game (887 files)
   GAME_FILES.txt                exact list of the game files in assets/game
 
 INSTALL ON THE PS5
@@ -46,16 +44,15 @@ example:
     PC:      Class of 09 The Flip Side\game\images\home jecka ext day.jpg
     PS5:     /data/homebrew/PPSA09011/assets/game/images/home jecka ext day.jpg
 
-The staged files are about 1.5 GB: images, audio, GUI art, fonts, the
-smoke/shadow/new-message/sparkle animation frames, and the laptop screen.
-Caches, saves, translations, .rpyc files, and unused fonts are not included.
-The videos are supplied separately as generated frame packs.
+The staged files are about 970 MB: images, audio, GUI art, fonts, the
+smoke/shadow/new-message/sparkle animation frames, the laptop screen, and the
+game's original VP8/Vorbis .webm videos. Caches, saves, translations, .rpyc
+files, and unused fonts are not included. Videos are decoded at runtime by
+libvpx and libvorbis; no frame packs are needed.
 
-Four generated data trees are also present:
+Generated data:
 
   assets/script.json              exported by tools/export_script.py
-  assets/videos/*.mp3             audio extracted from each .webm
-  assets/videos/packs/*.pkv       JPEG frame packs for all videos
   assets/game/                    staged copy of the game's runtime files
 
 CONTROLS

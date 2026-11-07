@@ -133,6 +133,10 @@ for flag in raw_libs:
     if flag == "-pthread":
         if flag not in cflags:
             cflags.append(flag)
+    elif flag in ("-lpthread", "-lrt", "-ldl"):
+        # The PS5 payload libc provides these symbols; there is no separate
+        # libpthread/librt/libdl archive in the clean-room SDK.
+        continue
     elif flag.startswith("-Wl,"):
         libs.extend(part for part in flag[4:].split(",") if part)
     else:

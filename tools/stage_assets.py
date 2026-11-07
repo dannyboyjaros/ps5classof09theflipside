@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Stage The Flip Side's assets into kit/assets for the PS5 package.
 
-    python3 tools/stage_assets.py <game-dir> <build-dir> <kit-assets-dir>
+    python3 tools/stage_assets.py <game-dir> <build-dir> <kit-assets-dir> [--packs]
 
 Copies only what the runtime loads: the images/audio the bytecode references,
 the GUI art (including the menu buttons and ending tracker), the laptop screen,
-the fonts, and the video packs.  Writes GAME_FILES.txt.
+the fonts, and the original .webm videos.  The PS5 runtime decodes WebM with
+libvpx/libvorbis, so frame packs are optional and are copied only with
+``--packs``.  Writes GAME_FILES.txt.
 """
 import json
 import os
@@ -16,6 +18,7 @@ import sys
 GAME = os.path.abspath(sys.argv[1])
 BUILD = os.path.abspath(sys.argv[2])
 ASSETS = os.path.abspath(sys.argv[3])
+COPY_PACKS = "--packs" in sys.argv[4:]
 
 FONTS = [
     "handwriting2.ttf",
@@ -81,6 +84,10 @@ def main():
             rel = os.path.relpath(os.path.join(root, name), GAME).replace("\\", "/")
             if name.lower().endswith(".mp3"):
                 wanted.add(rel)
+    # Original game videos: the PS5 runtime decodes VP8/Vorbis WebM itself.
+    for name in os.listdir(GAME):
+        if name.lower().endswith(".webm"):
+            wanted.add(name)
     for folder in GUI_DIRS:
         base = os.path.join(GAME, folder)
         for root, _dirs, names in os.walk(base):
@@ -114,23 +121,26 @@ def main():
         shutil.copy2(src, dst)
         copied.append(rel)
 
-    # Bytecode + video packs.
+    # Bytecode + optional video packs.  The PS5 runtime decodes the original
+    # WebM files, so packs are a host/fallback option and are not staged by
+    # default.
     shutil.copy2(os.path.join(BUILD, "script.json"), os.path.join(ASSETS, "script.json"))
-    vids = os.path.join(BUILD, "videos")
-    packs_out = os.path.join(ASSETS, "videos", "packs")
-    os.makedirs(packs_out, exist_ok=True)
-    for name in os.listdir(vids):
-        src = os.path.join(vids, name)
-        if not os.path.isfile(src):
-            continue
-        if name.endswith(".mp3"):
-            shutil.copy2(src, os.path.join(ASSETS, "videos", name))
-    packs_src = os.path.join(vids, "packs")
-    if os.path.isdir(packs_src):
-        for name in os.listdir(packs_src):
-            src = os.path.join(packs_src, name)
-            if os.path.isfile(src) and name.endswith(".pkv"):
-                shutil.copy2(src, os.path.join(packs_out, name))
+    if COPY_PACKS:
+        vids = os.path.join(BUILD, "videos")
+        packs_out = os.path.join(ASSETS, "videos", "packs")
+        os.makedirs(packs_out, exist_ok=True)
+        for name in os.listdir(vids):
+            src = os.path.join(vids, name)
+            if not os.path.isfile(src):
+                continue
+            if name.endswith(".mp3"):
+                shutil.copy2(src, os.path.join(ASSETS, "videos", name))
+        packs_src = os.path.join(vids, "packs")
+        if os.path.isdir(packs_src):
+            for name in os.listdir(packs_src):
+                src = os.path.join(packs_src, name)
+                if os.path.isfile(src) and name.endswith(".pkv"):
+                    shutil.copy2(src, os.path.join(packs_out, name))
 
     with open(os.path.join(os.path.dirname(ASSETS), "GAME_FILES.txt"), "w", encoding="utf-8") as f:
         for rel in copied:
