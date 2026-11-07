@@ -1224,6 +1224,7 @@ static int load_game(Engine *e, int slot) {
     stop_channel(e, "ambient", 0);
     stop_channel(e, "music", 0);
     clear_items(e);
+    e->rollback_count = 0;
     e->choice_count = 0;
     e->choice_index = 0;
     e->waiting = 0;
@@ -1930,6 +1931,7 @@ static void enter_main_menu(Engine *e) {
     e->tracker_popup = 0;
     e->menu_hover_index = -1;
     e->menu_sparkle_start = SDL_GetTicks();
+    e->rollback_count = 0;
     if (e->gui_menu_music[0]) {
         play_chunk(e, "music", e->gui_menu_music, 0, 1);
     }
@@ -1966,6 +1968,7 @@ static void start_label(Engine *e, const char *label) {
     e->hud = 1;
     e->csbox = 0;
     e->laptop_active = 0;
+    e->rollback_count = 0;
     e->pc = index >= 0 ? index : 0;
     e->mode = MODE_GAME;
 }
@@ -2064,6 +2067,80 @@ static void select_choice(Engine *e) {
     }
 }
 
+/* ------------------------------------------------------------------------- */
+/* dialogue rollback (the phone's BACK pill bottle)                          */
+/* ------------------------------------------------------------------------- */
+
+static void rollback_push(Engine *e, int pc, const char *speaker, const char *line, const char *voice, double start,
+                          double end) {
+    RollbackState *state;
+    if (e->rollback_count >= ROLLBACK_STATES) {
+        memmove(&e->rollback[0], &e->rollback[1], sizeof(RollbackState) * (ROLLBACK_STATES - 1));
+        e->rollback_count = ROLLBACK_STATES - 1;
+    }
+    state = &e->rollback[e->rollback_count++];
+    memset(state, 0, sizeof(*state));
+    state->pc = pc;
+    state->timestamp = SDL_GetTicks();
+    copy_str(state->speaker, sizeof(state->speaker), speaker);
+    copy_str(state->line, sizeof(state->line), line);
+    copy_str(state->voice, sizeof(state->voice), voice);
+    state->line_start = start;
+    state->line_end = end;
+    state->hud = e->hud;
+    state->csbox = e->csbox;
+    state->item_count = e->item_count;
+    state->next_order = e->next_order;
+    memcpy(state->items, e->items, sizeof(e->items));
+}
+
+static int rollback_previous(Engine *e) {
+    RollbackState *state;
+    double duration;
+    if (e->rollback_count <= 1) {
+        return 0;
+    }
+    /* Drop the line currently on screen; restore the one before it. */
+    e->rollback_count--;
+    state = &e->rollback[e->rollback_count - 1];
+    memcpy(e->items, state->items, sizeof(e->items));
+    e->item_count = state->item_count;
+    e->next_order = state->next_order;
+    e->hud = state->hud;
+    e->csbox = state->csbox;
+    e->speaker[0] = 0;
+    copy_str(e->speaker, sizeof(e->speaker), state->speaker);
+    copy_str(e->line, sizeof(e->line), state->line);
+    copy_str(e->voice, sizeof(e->voice), state->voice);
+    e->line_start = state->line_start;
+    e->line_end = state->line_end;
+    e->line_shown = 1;
+    e->choice_count = 0;
+    e->choice_index = 0;
+    e->laptop_active = 0;
+    e->ending_active = 0;
+    e->waiting = 1;
+    e->wait_kind = WAIT_SAY;
+    duration = (state->line_end > state->line_start && state->line_end > 0.0)
+                   ? state->line_end - state->line_start
+                   : 0.0;
+    if (duration > 0.01) {
+        e->wait_auto = 1;
+        e->wait_deadline = SDL_GetTicks() + (Uint32)(duration * 1000.0);
+    } else {
+        e->wait_auto = 0;
+        e->wait_deadline = 0;
+    }
+    e->pc = state->pc + 1;
+    if (e->voice[0]) {
+        play_voice(e, e->voice, e->line_start > 0.0 ? e->line_start : 0.0);
+    } else {
+        stop_voice(e);
+    }
+    play_chunk(e, "sfx", "audio/Phone_button.mp3", 0, 0);
+    return 1;
+}
+
 static void execute_op(Engine *e) {
     JsonValue *op;
     const char *kind;
@@ -2084,6 +2161,11 @@ static void execute_op(Engine *e) {
         double start = op_num(op, 3);
         double end = op_num(op, 4);
         double duration = (end > start && end > 0.0) ? end - start : 0.0;
+        voice = op_str(op, 5);
+        if (!voice[0]) {
+            voice = e->voice;
+        }
+        rollback_push(e, e->pc, op_str(op, 1), op_str(op, 2), voice, start, end);
         e->pc++;
         copy_str(e->speaker, sizeof(e->speaker), op_str(op, 1));
         copy_str(e->line, sizeof(e->line), op_str(op, 2));
@@ -2098,10 +2180,6 @@ static void execute_op(Engine *e) {
         } else {
             e->wait_auto = 0;
             e->wait_deadline = 0;
-        }
-        voice = op_str(op, 5);
-        if (!voice[0]) {
-            voice = e->voice;
         }
         if (voice[0]) {
             play_voice(e, voice, start > 0.0 ? start : 0.0);
@@ -2565,9 +2643,22 @@ static void on_confirm(Engine *e) {
 }
 
 static void on_back(Engine *e) {
+    if (e->video_active && e->video_mode != 3) {
+        if (e->video_mode == 2) {
+            e->boot_index = BOOT_COUNT;
+        }
+        video_finish(e);
+        return;
+    }
     if (e->mode == MODE_GAME) {
-        if (!e->ending_active) {
-            enter_pause(e);
+        if (e->ending_active) {
+            e->ending_active = 0;
+            e->waiting = 0;
+            e->wait_auto = 0;
+            e->wait_kind = WAIT_NONE;
+            e->line_shown = 0;
+        } else {
+            rollback_previous(e);
         }
     } else if (e->mode == MODE_PAUSE) {
         resume_game(e);
@@ -3118,6 +3209,16 @@ static void draw_laptop(Engine *e) {
     draw_text(e, FONT_SMALL, "Cross / Enter: search the web", 0xFFFFFF, 0, x + 40, y + h - 50, 0, 0);
 }
 
+static void draw_quick_menu(Engine *e) {
+    if (!e->hud || e->mode != MODE_GAME || e->laptop_active || e->ending_active) {
+        return;
+    }
+    /* The game's quick-menu overlays: BACK pill bottle (bottom left) and the
+     * PAUSE phone (bottom right). */
+    draw_image(e, "gui/back_pills_vert.png", 156, 836, 110, 240, 255, 0);
+    draw_image(e, "gui/pause_phone.png", 1513, 885, 350, 176, 255, 0);
+}
+
 static void draw_world(Engine *e) {
     draw_layer(e, "master");
     draw_layer(e, "screens");
@@ -3131,9 +3232,10 @@ static void draw_world(Engine *e) {
     }
     if (e->mode == MODE_GAME && e->wait_kind == WAIT_MENU && e->choice_count > 0) {
         draw_choices(e);
-        return;
+    } else {
+        draw_dialogue(e);
     }
-    draw_dialogue(e);
+    draw_quick_menu(e);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -3478,7 +3580,7 @@ static void draw_about(Engine *e) {
              "with this app.\n\n"
              "Endings discovered: %d / %d\n\n"
              "Cross: advance / confirm\n"
-             "Circle: back, or pause during a scene\n"
+             "Circle: back one line\n"
              "D-pad: navigate\n"
              "Options / Start: in-game menu\n"
              "Square / T: ending tracker from the main menu\n\n"
@@ -3850,6 +3952,10 @@ int engine_init(Engine *e, const char *script_path, const char *game_dir) {
         if (capture && capture[0]) {
             e->capture_at = SDL_GetTicks() + (Uint32)atoi(capture);
         }
+        capture = getenv("C09FS_TEST_BACK");
+        if (capture && capture[0]) {
+            e->test_back_at = SDL_GetTicks() + (Uint32)atoi(capture);
+        }
     }
 
 #ifdef __PROSPERO__
@@ -4202,6 +4308,10 @@ int engine_frame(Engine *e) {
         return 0;
     }
     update_video(e);
+    if (e->test_back_at && time_reached(e->test_back_at)) {
+        e->test_back_at = 0;
+        rollback_previous(e);
+    }
 
     if (e->splash_active) {
         Uint32 elapsed = SDL_GetTicks() - e->splash_start;

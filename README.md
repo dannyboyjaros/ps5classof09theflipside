@@ -123,7 +123,7 @@ Saves and screenshots go to `build/saves`.
 | Action | DualSense | Keyboard |
 | --- | --- | --- |
 | Advance / confirm | Cross | Enter / Space |
-| Back, pause during a scene | Circle | Esc |
+| Back one line | Circle | Esc |
 | Navigate | D-pad | Arrows |
 | In-game menu | Options | Tab |
 | Ending tracker (main menu) | Square | T |
@@ -135,6 +135,7 @@ Saves and screenshots go to `build/saves`.
   jumps to a label.
 - `C09FS_TRACKER=1` opens the ending tracker (with `build/saves/seen.txt`).
 - `C09FS_CAPTURE=<ms>` writes one screenshot; F12 takes one on demand.
+- `C09FS_TEST_BACK=<ms>` triggers one dialogue rollback for testing.
 - `C09FS_SAVE_DIR=<dir>` overrides the save folder on the console build.
 - F9 dumps interpreter state to the log.
 

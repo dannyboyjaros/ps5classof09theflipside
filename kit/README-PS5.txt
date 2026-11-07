@@ -61,7 +61,7 @@ Four generated data trees are also present:
 CONTROLS
 --------
   Cross           advance / confirm
-  Circle          step back one line (pause in menus)
+  Circle          back one line (the BACK pill bottle)
   Square          ending tracker (from the main menu)
   D-pad           navigate
   Options/Start   in-game menu

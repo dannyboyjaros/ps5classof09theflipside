@@ -27,6 +27,7 @@
 #define MAX_ANIM 8
 #define MAX_SEEN 64
 #define MAX_TOAST 256
+#define ROLLBACK_STATES 16
 
 /* Font slots.  Every slot has a path and a pixel size from the game GUI. */
 enum {
@@ -120,13 +121,27 @@ typedef struct {
 } LayerItem;
 
 typedef struct {
+    int pc;                 /* index of the say op this snapshot precedes */
+    Uint32 timestamp;
+    char speaker[128];
+    char line[MAX_TEXT];
+    char voice[MAX_PATH];
+    double line_start;
+    double line_end;
+    int hud;
+    int csbox;
+    int item_count;
+    int next_order;
+    LayerItem items[MAX_ITEMS];
+} RollbackState;
+
+typedef struct {
     JsonValue *root;
     JsonValue *ops;
     JsonValue *labels;
     JsonValue *gui;
     JsonValue *endings;
     JsonValue *animations;
-
     int pc;
     int call_stack[CALL_STACK];
     int call_depth;
@@ -270,6 +285,7 @@ typedef struct {
     char toast[MAX_TOAST];
     int shot_requested;
     Uint32 capture_at;
+    Uint32 test_back_at;
 
     /* persistent ending tracker */
     int seen_count;
@@ -285,6 +301,10 @@ typedef struct {
     /* main-menu sparkle tied to the selected button */
     int menu_hover_index;
     Uint32 menu_sparkle_start;
+
+    /* dialogue rollback (Circle / the BACK pill bottle) */
+    int rollback_count;
+    RollbackState rollback[ROLLBACK_STATES];
 } Engine;
 
 int engine_init(Engine *engine, const char *script_path, const char *game_dir);
