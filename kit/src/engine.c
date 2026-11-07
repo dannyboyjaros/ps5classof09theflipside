@@ -31,6 +31,7 @@ static int tracker_build_rows(Engine *e, TrackerRow *rows, int max_rows);
 #endif
 
 #ifdef __PROSPERO__
+#include <unistd.h>
 /* The app folder is mounted read-only at /app0. Writable storage lives in
  * /download0, which the console creates because param.json has a positive
  * downloadDataSize. */
@@ -1517,11 +1518,76 @@ static void video_name_from_file(const char *file, char *out, size_t n) {
     }
 }
 
+#ifdef __PROSPERO__
+/* VP8 decoding runs on its own core so the menu and dialogue never wait for
+ * it. The thread decodes to the wall clock and publishes a converted frame;
+ * draw_video only copies the published buffer under the mutex. */
+static void *video_decode_thread(void *arg) {
+    Engine *e = (Engine *)arg;
+    WebmPlayer *player = (WebmPlayer *)e->webm_player;
+    while (!e->video_thread_stop && e->video_active && e->webm_player == player) {
+        Uint32 now = SDL_GetTicks();
+        double t = (double)(now - e->video_start) / 1000.0;
+        double duration = webm_duration(player);
+        const unsigned char *rgba = NULL;
+        int width = 0;
+        int height = 0;
+        int serial = 0;
+        if (e->video_loop && duration > 0.01) {
+            while (t >= duration) {
+                t -= duration;
+            }
+        }
+        /* Decode unlocked: only the publish step takes the mutex. */
+        if (webm_frame(player, t, &rgba, &width, &height, &serial) && rgba &&
+            width > 0 && height > 0) {
+            size_t need = (size_t)width * (size_t)height * 4u;
+            pthread_mutex_lock(&e->video_mutex);
+            if (e->video_buf_size < need) {
+                unsigned char *a = (unsigned char *)realloc(e->video_buf[0], need);
+                unsigned char *b = (unsigned char *)realloc(e->video_buf[1], need);
+                if (a) {
+                    e->video_buf[0] = a;
+                }
+                if (b) {
+                    e->video_buf[1] = b;
+                }
+                if (a && b) {
+                    e->video_buf_size = need;
+                }
+            }
+            if (e->video_buf_size >= need) {
+                int back = 1 - e->video_buf_index;
+                memcpy(e->video_buf[back], rgba, need);
+                e->video_buf_index = back;
+                e->video_buf_serial = serial;
+                e->video_buf_w = width;
+                e->video_buf_h = height;
+            }
+            pthread_mutex_unlock(&e->video_mutex);
+        }
+        usleep(4000);
+    }
+    return NULL;
+}
+#endif
+
 static void video_release(Engine *e) {
+#ifdef __PROSPERO__
+    if (e->video_thread_live) {
+        e->video_thread_stop = 1;
+        pthread_join(e->video_thread, NULL);
+        e->video_thread_live = 0;
+    }
+    e->video_thread_stop = 0;
+    e->video_buf_serial = -1;
+#endif
     if (e->video_tex) {
         SDL_DestroyTexture(e->video_tex);
         e->video_tex = NULL;
     }
+    e->video_tex_w = 0;
+    e->video_tex_h = 0;
     if (e->video_music) {
         Mix_HaltMusic();
         Mix_FreeMusic(e->video_music);
@@ -1599,6 +1665,18 @@ static int video_start(Engine *e, const char *name, int loop, int mode) {
                     remove(wav_path);
                 }
             }
+#ifdef __PROSPERO__
+            if (!e->video_mutex_ready) {
+                pthread_mutex_init(&e->video_mutex, NULL);
+                e->video_mutex_ready = 1;
+            }
+            e->video_thread_stop = 0;
+            e->video_buf_serial = -1;
+            e->video_buf_index = 0;
+            if (pthread_create(&e->video_thread, NULL, video_decode_thread, e) == 0) {
+                e->video_thread_live = 1;
+            }
+#endif
             if (mode == 0) {
                 e->waiting = 1;
                 e->wait_auto = 0;
@@ -1718,6 +1796,32 @@ static SDL_Surface *video_surface(const unsigned char *data, int len) {
 #endif
 }
 
+#if defined(__PROSPERO__) || defined(C09FS_WEBM)
+static void video_upload(Engine *e, const unsigned char *src, int width, int height, int serial) {
+    if (!src || width <= 0 || height <= 0) {
+        return;
+    }
+    /* One streaming texture for the whole video: no per-frame allocation and
+     * a single copy into it. */
+    if (!e->video_tex || e->video_tex_w != width || e->video_tex_h != height) {
+        if (e->video_tex) {
+            SDL_DestroyTexture(e->video_tex);
+        }
+        e->video_tex = SDL_CreateTexture(e->renderer, SDL_PIXELFORMAT_ARGB8888,
+                                         SDL_TEXTUREACCESS_STREAMING, width, height);
+        if (e->video_tex) {
+            SDL_SetTextureBlendMode(e->video_tex, SDL_BLENDMODE_BLEND);
+        }
+        e->video_tex_w = width;
+        e->video_tex_h = height;
+    }
+    if (e->video_tex) {
+        SDL_UpdateTexture(e->video_tex, NULL, src, width * 4);
+        e->webm_tex_serial = serial;
+    }
+}
+#endif
+
 static void draw_video(Engine *e) {
     Uint32 elapsed;
     int index;
@@ -1732,31 +1836,33 @@ static void draw_video(Engine *e) {
         int width = 0;
         int height = 0;
         int serial = 0;
+        const unsigned char *src = NULL;
         if (e->video_loop && duration > 0.01) {
             while (seconds >= duration) {
                 seconds -= duration;
             }
         }
-        if (webm_frame((WebmPlayer *)e->webm_player, seconds, &rgba, &width, &height, &serial) && rgba) {
-            if (serial != e->webm_tex_serial) {
-                SDL_Surface *frame = SDL_CreateRGBSurfaceWithFormat(0, width, height, 32,
-                                                                    SDL_PIXELFORMAT_ARGB8888);
-                if (frame && frame->pixels) {
-                    memcpy(frame->pixels, rgba, (size_t)width * (size_t)height * 4u);
-                    if (e->video_tex) {
-                        SDL_DestroyTexture(e->video_tex);
-                    }
-                    e->video_tex = SDL_CreateTextureFromSurface(e->renderer, frame);
-                    if (e->video_tex) {
-                        SDL_SetTextureBlendMode(e->video_tex, SDL_BLENDMODE_BLEND);
-                    }
-                    e->webm_tex_serial = serial;
-                }
-                if (frame) {
-                    SDL_FreeSurface(frame);
-                }
+#if defined(__PROSPERO__)
+        if (e->video_thread_live && e->video_mutex_ready) {
+            pthread_mutex_lock(&e->video_mutex);
+            if (e->video_buf_serial != e->webm_tex_serial && e->video_buf_size > 0) {
+                src = e->video_buf[e->video_buf_index];
+                width = e->video_buf_w;
+                height = e->video_buf_h;
+                serial = e->video_buf_serial;
+            }
+            video_upload(e, src, width, height, serial);
+            pthread_mutex_unlock(&e->video_mutex);
+        } else {
+            if (webm_frame((WebmPlayer *)e->webm_player, seconds, &rgba, &width, &height, &serial)) {
+                video_upload(e, rgba, width, height, serial);
             }
         }
+#else
+        if (webm_frame((WebmPlayer *)e->webm_player, seconds, &rgba, &width, &height, &serial)) {
+            video_upload(e, rgba, width, height, serial);
+        }
+#endif
         if (!e->video_tex) {
             return;
         }
@@ -2789,6 +2895,7 @@ static void on_back(Engine *e) {
             e->tracker_text = 0;
             e->tracker_scroll = 0;
         } else {
+            e->tracker_opened = 0;
             e->mode = MODE_MENU;
         }
     }
@@ -3604,17 +3711,12 @@ static void draw_tracker(Engine *e) {
     TrackerRow rows[16];
     int row_count = tracker_build_rows(e, rows, 16);
     int i;
-    const int hx = -1901;
-    const int hy = -214;
-    const int hw = 5376;
-    const int hh = 3024;
     const int list_x = 636;
     const int list_y = 266;
     const int list_w = 644;
     const int list_h = 50;
     const int list_step = 50;
 
-    draw_image(e, "gui/ending_tracker/ending_tracker_pda.png", hx, hy, hw, hh, 255, 0);
     draw_image(e, "gui/ending_tracker/base_screen.png", 0, 0, SCREEN_W, SCREEN_H, 255, 0);
     snprintf(count, sizeof(count), "%d/5", e->seen_count);
     draw_text(e, FONT_TRACKER_COUNT, count, 0xFFFFFF, 0, 848, 134, 0, 0);

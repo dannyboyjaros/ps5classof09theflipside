@@ -8,6 +8,10 @@
 #include <SDL_mixer.h>
 #include <SDL_ttf.h>
 
+#ifdef __PROSPERO__
+#include <pthread.h>
+#endif
+
 /* The game is authored for a 1920x1080 virtual screen. */
 #define SCREEN_W 1920
 #define SCREEN_H 1080
@@ -278,8 +282,23 @@ typedef struct {
     int video_frames;
     SDL_Texture *video_tex;
     int video_tex_index;
+    int video_tex_w;
+    int video_tex_h;
     Uint32 video_start;
     Mix_Music *video_music;
+#ifdef __PROSPERO__
+    pthread_t video_thread;
+    pthread_mutex_t video_mutex;
+    int video_mutex_ready;
+    int video_thread_live;
+    int video_thread_stop;
+    unsigned char *video_buf[2];
+    size_t video_buf_size;
+    int video_buf_index;
+    int video_buf_serial;
+    int video_buf_w;
+    int video_buf_h;
+#endif
     int boot_active;
     int boot_index;
 
