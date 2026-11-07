@@ -1,0 +1,30 @@
+# Build outputs and generated assets
+build/
+build-*/
+dist/
+out/
+out-*/
+run-test/
+kit/.deps/
+kit/build/
+kit/dist/
+kit/assets/
+*.zip
+*.tar
+
+# Python build artefacts
+*.pyo
+*.pyc
+__pycache__/
+
+# Runtime data
+saves/
+*.pkv
+*.bmp
+
+# Local host test captures and logs
+run-*.png
+run-*.jpg
+run-*.err
+run-*.out
+run-*.log
