@@ -84,7 +84,9 @@ enum {
     SDLK_KP_2 = 0x4000005a,
     SDLK_F9 = 0x40000042,
     SDLK_F11 = 0x40000044,
-    SDLK_F12 = 0x40000045
+    SDLK_F12 = 0x40000045,
+    SDLK_e = 0x65,
+    SDLK_t = 0x74
 };
 
 /* ---- game controller ---- */
