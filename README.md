@@ -138,7 +138,7 @@ Saves and screenshots go to `build/saves`.
 | Back one line | Circle | Esc |
 | Navigate | D-pad | Arrows |
 | In-game menu | Options | Tab |
-| Ending tracker (main menu) | Square | T |
+| Ending tracker (main menu) | Triangle | T |
 | Change an option | D-pad left/right | Left/Right |
 
 ## Diagnostics

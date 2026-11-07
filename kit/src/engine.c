@@ -3091,7 +3091,7 @@ static int button_action(Uint8 button) {
     case SDL_CONTROLLER_BUTTON_START:
     case SDL_CONTROLLER_BUTTON_BACK:
         return ACT_PAUSE;
-    case SDL_CONTROLLER_BUTTON_X:
+    case SDL_CONTROLLER_BUTTON_Y:
         return ACT_TRACKER;
     default:
         return ACT_NONE;
@@ -3530,7 +3530,7 @@ static void draw_main_menu(Engine *e) {
         Uint32 elapsed = SDL_GetTicks() - e->new_message_start;
         draw_anim_frame(e, "new_message", elapsed, 0, 0, 0, SCREEN_W, SCREEN_H, 255);
     }
-    draw_text(e, FONT_SMALL, "Unofficial homebrew runtime  -  Cross: select   D-pad: move", 0x9A9A9A, 0, 30,
+    draw_text(e, FONT_SMALL, "Unofficial homebrew runtime  -  Cross: select   D-pad: move   Triangle: endings", 0x9A9A9A, 0, 30,
               SCREEN_H - 40, 0, 0);
 }
 
@@ -3799,7 +3799,7 @@ static void draw_about(Engine *e) {
              "Circle: back one line\n"
              "D-pad: navigate\n"
              "Options / Start: in-game menu\n"
-             "Square / T: ending tracker from the main menu\n\n"
+             "Triangle / T: ending tracker from the main menu\n\n"
              "Not affiliated with the developers, publishers, or Sony.",
              e->seen_count, total);
     draw_text(e, FONT_SMALL, body, 0xDDDDDD, 1300, 260, 190, 0, 8);

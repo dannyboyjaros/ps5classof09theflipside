@@ -59,7 +59,7 @@ CONTROLS
 --------
   Cross           advance / confirm
   Circle          back one line (the BACK pill bottle)
-  Square          ending tracker (from the main menu)
+  Triangle        ending tracker (from the main menu)
   D-pad           navigate
   Options/Start   in-game menu
   Any button      skip the startup logo or a movie
