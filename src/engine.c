@@ -3947,10 +3947,10 @@ static void load_gui(Engine *e) {
     e->gui_logo_h = 480;
 
     e->gui_name_x = 310;
-    e->gui_name_y = 806;
+    e->gui_name_y = 840;
     e->gui_name_color = 0x279BE8;
     e->gui_dialogue_x = 320;
-    e->gui_dialogue_y = 857;
+    e->gui_dialogue_y = 905;
     e->gui_dialogue_w = 1116;
     e->gui_dialogue_spacing = -5;
     e->gui_dialogue_color = 0x000000;
@@ -3972,7 +3972,7 @@ static void load_gui(Engine *e) {
     copy_str(e->font_paths[FONT_CHOICE], MAX_PATH, "HELVETICA_LT_NARROW.TTF");
     copy_str(e->font_paths[FONT_MENU], MAX_PATH, "FUTURA.TTF");
     e->font_sizes[FONT_DIALOGUE] = 50;
-    e->font_sizes[FONT_NAME] = 75;
+    e->font_sizes[FONT_NAME] = 60;
     e->font_sizes[FONT_CHOICE] = 50;
     e->font_sizes[FONT_MENU] = 60;
 

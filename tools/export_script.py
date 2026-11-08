@@ -1267,17 +1267,17 @@ def build_gui(index):
         "logo": {"file": rl("gui/ClassOf09logo.png"), "x": 520, "y": 300, "w": 880, "h": 480},
         "name": {
             "x": 310,
-            # The textbox image is 1920x229 and sits at the bottom of a
-            # 278px window; 806 keeps the name just above the visible box.
-            "y": 806,
+            # Put the name on the paper and leave room below it for the
+            # first dialogue line (the box image starts at y=851).
+            "y": 840,
             "font": rl("HELVETICA_EXTRA_COMPRESSED.TTF"),
-            "size": 75,
+            "size": 60,
             "color": "#279be8",
         },
         "dialogue": {
             "x": 320,
-            # gui.dialogue_ypos is 55 inside the 278px window at y=802.
-            "y": 857,
+            # Start below the name so the two never overlap.
+            "y": 905,
             "w": 1116,
             "font": rl("handwriting2.ttf"),
             "size": 50,
